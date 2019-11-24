@@ -1,4 +1,4 @@
-import React, { useState, MouseEventHandler } from 'react'
+import React, { useState, MouseEventHandler, DragEventHandler } from 'react'
 import styled from '../../lib/styled'
 import { Link } from '../../lib/router'
 import Icon from '../atoms/Icon'
@@ -60,6 +60,8 @@ export interface NavigatorNode {
   href?: string
   children?: NavigatorNode[]
   onContextMenu?: MouseEventHandler
+  onDrop?: DragEventHandler
+  onDragOver?: DragEventHandler
   active?: boolean
 }
 
@@ -74,7 +76,16 @@ const SideNavigatorItem = ({
   openAlways = false,
   depth = 0
 }: SideNavigatorItemProps) => {
-  const { iconPath, name, href, children, onContextMenu, active } = item
+  const {
+    iconPath,
+    name,
+    href,
+    children,
+    onContextMenu,
+    active,
+    onDragOver,
+    onDrop
+  } = item
   const [open, setOpen] = useState(true)
   const childrenExists = children != null && children.length > 0
   return (
@@ -94,6 +105,8 @@ const SideNavigatorItem = ({
           className={cc(['headerLink', active && 'active'])}
           style={{ paddingLeft: `${10 * depth + 26}px` }}
           onContextMenu={onContextMenu}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
         >
           {iconPath != null && <Icon className='storageIcon' path={iconPath} />}
           {name}

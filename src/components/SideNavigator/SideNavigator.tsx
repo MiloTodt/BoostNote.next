@@ -77,6 +77,7 @@ export default () => {
     removeStorage,
     createFolder,
     removeFolder,
+    updateNote,
     storageMap
   } = useDb()
   const routeParams = useRouteParams()
@@ -164,6 +165,7 @@ export default () => {
               removeStorage={removeStorage}
               createFolder={createFolder}
               removeFolder={removeFolder}
+              updateNote={updateNote}
             />
           )
         })}

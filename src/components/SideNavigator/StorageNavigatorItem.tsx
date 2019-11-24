@@ -1,6 +1,6 @@
 import React, { useMemo, useCallback, MouseEventHandler } from 'react'
 import SideNavigatorItem, { NavigatorNode } from './SideNavigatorItem'
-import { NoteStorage } from '../../lib/db/types'
+import { NoteStorage, NoteDocEditibleProps, NoteDoc } from '../../lib/db/types'
 import {
   mdiTagMultiple,
   mdiDeleteOutline,
@@ -19,6 +19,11 @@ interface StorageNaviagtorItemProps {
   removeStorage: (storageId: string) => Promise<void>
   createFolder: (storageId: string, folderPath: string) => Promise<void>
   removeFolder: (storageId: string, folderPath: string) => Promise<void>
+  updateNote(
+    storageId: string,
+    noteId: string,
+    noteProps: Partial<NoteDocEditibleProps>
+  ): Promise<NoteDoc | undefined>
 }
 
 type FolderTree = {
@@ -273,6 +278,14 @@ function getNavigatorNodeFromPathnameTree(
       href: pathname,
       active: folderIsActive,
       onContextMenu: contextMenuHandlerCreator(folderPathname),
+      onDragOver: (event: React.DragEvent<unknown>) => {
+        event.preventDefault()
+      },
+      onDrop: (event: React.DragEvent<unknown>) => {
+        const { storageId, note } = JSON.parse(
+          event.dataTransfer.getData('application/x-note-json')
+        )
+      },
       children: getNavigatorNodeFromPathnameTree(
         tree,
         storageId,
