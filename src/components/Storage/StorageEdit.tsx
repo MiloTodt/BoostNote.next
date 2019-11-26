@@ -8,6 +8,7 @@ import { NoteStorage } from '../../lib/db/types'
 import { useRouter } from '../../lib/router'
 import { useDebounce } from 'react-use'
 import LoginButton from '../atoms/LoginButton'
+import { useToast } from '../../lib/toast'
 
 interface StorageEditProps {
   storage: NoteStorage
@@ -16,6 +17,7 @@ interface StorageEditProps {
 export default ({ storage }: StorageEditProps) => {
   const db = useDb()
   const router = useRouter()
+  const { pushMessage } = useToast()
   const { preferences } = usePreferences()
   const [name, setName] = useState(storage.name)
 
@@ -29,10 +31,13 @@ export default ({ storage }: StorageEditProps) => {
     async (cloudStorage: CloudStorage) => {
       const success = await db.setCloudLink(storage.id, cloudStorage, user)
       if (!success) {
-        //TODO: toast syncing failed
+        pushMessage({
+          title: 'Sync Error',
+          description: 'The storage was unable to be synced with the cloud'
+        })
       }
     },
-    [storage.id, db, user]
+    [storage.id, db, user, pushMessage]
   )
 
   const unlinkCallback = useCallback(() => {
