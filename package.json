@@ -24,6 +24,12 @@
     "tsc": "tsc --watch --noEmit",
     "rebuild": "electron-rebuild"
   },
+  "husky": {
+    "hooks": {
+      "pre-commit": "",
+      "pre-push": "npm test && npm run lint --fix",
+    }
+  },
   "keywords": [
     "markdown",
     "snippet",
