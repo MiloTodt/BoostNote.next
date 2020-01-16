@@ -1,7 +1,6 @@
 import { usePreferences } from '../preferences'
-import { CloudStorage, getStorages } from './api/storage'
-import { Subscription, getSubscription } from './api/subscription'
-import { useState, useEffect } from 'react'
+import { CloudStorage } from './api/storage'
+import { Subscription } from './api/subscription'
 
 export interface User {
   token: string
@@ -12,6 +11,7 @@ export interface User {
 export interface UserCloudInfo {
   storages: CloudStorage[]
   subscription: Subscription | undefined
+  usage: number
 }
 
 interface UserRepo {
@@ -35,40 +35,6 @@ export const useUsers = (): [User[], UserRepo] => {
   }
 
   return [users, repo]
-}
-
-const cache: { [key: number]: UserCloudInfo } = {}
-export const useUserCloudInfo = (
-  user: User
-): ['loading' | UserCloudInfo, () => void, boolean] => {
-  const [info, setInfo] = useState<'loading' | UserCloudInfo>(() => {
-    return cache[user.id] != undefined ? cache[user.id] : 'loading'
-  })
-  const [forceFlag, setForceFlag] = useState(true)
-  const [running, setRunning] = useState(false)
-
-  useEffect(() => {
-    let subscribed = true
-    setRunning(true)
-    getUserCloudInfo(user).then(info => {
-      cache[user.id] = info
-      setRunning(false)
-      if (subscribed) {
-        setInfo(info)
-      }
-    })
-    return () => {
-      subscribed = false
-    }
-  }, [user, forceFlag])
-
-  return [info, () => setForceFlag(!forceFlag), running]
-}
-
-const getUserCloudInfo = (user: User): Promise<UserCloudInfo> => {
-  return Promise.all([getStorages(user), getSubscription(user)]).then(
-    ([storages, subscription]) => ({ storages, subscription })
-  )
 }
 
 const removeUser = (user: User, users: User[]) => {

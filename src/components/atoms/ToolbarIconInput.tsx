@@ -1,6 +1,6 @@
 import React from 'react'
 import styled from '../../lib/styled'
-import Icon from './Icon'
+import ButtonIcon from './ButtonIcon'
 const StyledContainer = styled.div`
   position: relative;
   height: 22px;
@@ -26,20 +26,20 @@ const StyledContainer = styled.div`
 
 interface ToolbarIconInputProps {
   className?: string
-  iconPath: string
+  icon: React.ReactNode
   value: string
   onChange: React.ChangeEventHandler<HTMLInputElement>
 }
 
 const ToolbarIconInput = ({
   className,
-  iconPath,
+  icon,
   value,
   onChange
 }: ToolbarIconInputProps) => {
   return (
     <StyledContainer className={className}>
-      <Icon path={iconPath} className='icon' />
+      <ButtonIcon icon={icon} className='icon' />
       <input className='input' value={value} onChange={onChange} />
     </StyledContainer>
   )

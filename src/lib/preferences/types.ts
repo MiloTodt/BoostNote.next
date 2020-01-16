@@ -1,11 +1,23 @@
 import { User } from '../accounts'
 
-export type GeneralThemeOptions = 'auto' | 'light' | 'dark' | 'solarized-dark'
-export type GeneralLanguageOptions = 'en-US' | 'ja'
+export type GeneralThemeOptions =
+  | 'auto'
+  | 'light'
+  | 'dark'
+  | 'sepia'
+  | 'solarizedDark'
+export type GeneralLanguageOptions =
+  | 'en-US'
+  | 'ja'
+  | 'es-ES'
+  | 'zh-CN'
+  | 'ko'
+  | 'pt-BR'
 export type GeneralNoteSortingOptions =
   | 'date-updated'
   | 'date-created'
   | 'title'
+export type GeneralTutorialsOptions = 'display' | 'hide'
 
 export type EditorIndentTypeOptions = 'tab' | 'spaces'
 export type EditorIndentSizeOptions = 2 | 4 | 8
@@ -18,6 +30,8 @@ export interface Preferences {
   'general.theme': GeneralThemeOptions
   'general.noteSorting': GeneralNoteSortingOptions
   'general.enableAnalytics': boolean
+  'general.enableDownloadAppModal': boolean
+  'general.tutorials': GeneralTutorialsOptions
 
   // Editor
   'editor.theme': string

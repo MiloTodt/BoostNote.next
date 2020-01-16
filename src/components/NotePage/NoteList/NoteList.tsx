@@ -1,16 +1,24 @@
-import React, { useCallback, KeyboardEvent, useRef } from 'react'
+import React, { useCallback, useRef, ChangeEventHandler } from 'react'
 import NoteItem from './NoteItem'
-import { NoteDoc } from '../../../lib/db/types'
+import { PopulatedNoteDoc } from '../../../lib/db/types'
 import styled from '../../../lib/styled'
-import { mdiMagnify, mdiSquareEditOutline } from '@mdi/js'
-import Icon from '../../atoms/Icon'
 import {
   borderBottom,
   inputStyle,
-  uiTextColor
+  iconColor,
+  noteListIconColor,
+  selectTabStyle
 } from '../../../lib/styled/styleFunctions'
+import { IconEdit, IconLoupe, IconArrowSingleDown } from '../../icons'
+import { useTranslation } from 'react-i18next'
+import {
+  useGlobalKeyDownHandler,
+  isWithGeneralCtrlKey
+} from '../../../lib/keyboard'
+import { NoteListSortOptions } from '../NotePage'
+import { osName } from '../../../lib/utils'
 
-const StyledContainer = styled.div`
+export const StyledNoteListContainer = styled.div`
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -22,10 +30,6 @@ const StyledContainer = styled.div`
     padding: 0;
     list-style: none;
     overflow-y: auto;
-
-    li.empty {
-      color: ${({ theme }) => theme.uiTextColor};
-    }
   }
 
   .control {
@@ -33,6 +37,7 @@ const StyledContainer = styled.div`
     display: flex;
     padding: 8px;
     align-items: center;
+    -webkit-app-region: drag;
     ${borderBottom}
   }
 
@@ -42,104 +47,201 @@ const StyledContainer = styled.div`
     height: 32px;
     .icon {
       position: absolute;
-      top: 5px;
-      left: 5px;
+      top: 8px;
+      left: 10px;
       font-size: 20px;
       z-index: 0;
       pointer-events: none;
+      ${noteListIconColor}
     }
     .input {
       position: relative;
       width: 100%;
       height: 32px;
-      padding-left: 30px;
+      padding-left: 35px;
       box-sizing: border-box;
       ${inputStyle}
     }
+    select {
+      appearance: none;
+    }
   }
+
+  .filterTab {
+    height: 25px;
+    display: flex;
+    align-items: center;
+    padding-left: 13px;
+    .filterIcon {
+      font-size: 10px;
+      margin-right: 5px;
+      z-index: 0;
+      pointer-events: none;
+      ${iconColor}
+    }
+    .input {
+      ${selectTabStyle}
+    }
+    select {
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+    }
+  }
+
   .newNoteButton {
-    width: 28px;
-    height: 28px;
+    width: 35px;
+    height: 30px;
     font-size: 24px;
     background: transparent;
     border: none;
-    ${uiTextColor}
+    ${noteListIconColor}
   }
 `
 
 type NoteListProps = {
-  storageId: string
-  notes: NoteDoc[]
-  createNote: () => Promise<void>
-  basePathname: string
-  currentNoteIndex: number
-  navigateUp: () => void
+  currentStorageId?: string
+  currentNoteId?: string
+  search: string
+  notes: PopulatedNoteDoc[]
+  createNote?: () => Promise<void>
+  setSearchInput: (input: string) => void
   navigateDown: () => void
+  navigateUp: () => void
+  basePathname: string
+  lastCreatedNoteId: string
+  setSort: (option: NoteListSortOptions) => void
+  trashOrPurgeCurrentNote: () => void
 }
 
 const NoteList = ({
   notes,
-  currentNoteIndex,
   createNote,
-  storageId,
+  currentStorageId,
   basePathname,
+  search,
+  currentNoteId,
+  setSearchInput,
+  navigateDown,
   navigateUp,
-  navigateDown
+  lastCreatedNoteId,
+  setSort,
+  trashOrPurgeCurrentNote
 }: NoteListProps) => {
-  const handleListKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      switch (event.key) {
-        case 'ArrowDown':
-          navigateDown()
-          break
-        case 'ArrowUp':
-          navigateUp()
-          break
-      }
+  const { t } = useTranslation()
+  const updateSearchInput: ChangeEventHandler<HTMLInputElement> = useCallback(
+    event => {
+      setSearchInput(event.target.value)
     },
-    [navigateUp, navigateDown]
+    [setSearchInput]
   )
 
   const listRef = useRef<HTMLUListElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  useGlobalKeyDownHandler(e => {
+    switch (e.key) {
+      case 's':
+        if (isWithGeneralCtrlKey(e) && !e.shiftKey) {
+          searchRef.current!.focus()
+        }
+        break
+      case 'j':
+        if (isWithGeneralCtrlKey(e)) {
+          e.preventDefault()
+          e.stopPropagation()
+          navigateDown()
+        }
+        break
+      case 'k':
+        if (isWithGeneralCtrlKey(e)) {
+          e.preventDefault()
+          e.stopPropagation()
+          navigateUp()
+        }
+        break
+      default:
+        break
+    }
+  })
 
   const focusList = useCallback(() => {
     listRef.current!.focus()
   }, [])
 
+  const handleListKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      switch (event.key) {
+        case 'Delete':
+          if (osName !== 'macos') {
+            trashOrPurgeCurrentNote()
+          }
+          break
+        case 'Backspace':
+          if (isWithGeneralCtrlKey(event)) {
+            trashOrPurgeCurrentNote()
+          }
+          break
+      }
+    },
+    [trashOrPurgeCurrentNote]
+  )
+
   return (
-    <StyledContainer>
+    <StyledNoteListContainer>
       <div className='control'>
         <div className='searchInput'>
           <input
+            ref={searchRef}
             className='input'
-            value={''}
-            onChange={() => {}}
-            placeholder='Search Notes'
+            value={search}
+            onChange={updateSearchInput}
+            placeholder={t('note.search')}
           />
-          <Icon className='icon' path={mdiMagnify} />
+          <IconLoupe className='icon' size='0.8em' />
         </div>
-        <button className='newNoteButton' onClick={createNote}>
-          <Icon path={mdiSquareEditOutline} />
-        </button>
+        {currentStorageId != null && createNote != null && (
+          <button className='newNoteButton' onClick={createNote}>
+            <IconEdit size='0.8em' />
+          </button>
+        )}
       </div>
-      <ul tabIndex={0} onKeyDown={handleListKeyDown} ref={listRef}>
-        {notes.map((note, index) => {
-          const noteIsCurrentNote = index === currentNoteIndex
+      <div className='filterTab'>
+        <IconArrowSingleDown className='filterIcon' size='0.8em' />
+        <select
+          className='input'
+          onChange={e => setSort(e.target.value as NoteListSortOptions)}
+        >
+          <option value='updatedAt'>Updated</option>
+          <option value='createdAt'>Created</option>
+          <option value='title'>Title</option>
+        </select>
+      </div>
+      <ul tabIndex={0} ref={listRef} onKeyDown={handleListKeyDown}>
+        {notes.map(note => {
+          const noteIsCurrentNote = note._id === currentNoteId
           return (
             <li key={note._id}>
               <NoteItem
                 active={noteIsCurrentNote}
                 note={note}
-                storageId={storageId}
                 basePathname={basePathname}
                 focusList={focusList}
+                search={search}
+                recentlyCreated={lastCreatedNoteId === note._id}
               />
             </li>
           )
         })}
-        {notes.length === 0 && <li className='empty'>No notes</li>}
+        {notes.length === 0 ? (
+          search.trim() === '' ? (
+            <li className='empty'>{t('note.nothing')}</li>
+          ) : (
+            <li className='empty'>{t('note.nothingMessage')}</li>
+          )
+        ) : null}
       </ul>
-    </StyledContainer>
+    </StyledNoteListContainer>
   )
 }
 

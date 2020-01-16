@@ -16,7 +16,8 @@ export interface NoteStorageData {
   name: string
   cloudStorage?: {
     id: number
-    name: string
+    size: number
+    updatedAt: number
   }
 }
 
@@ -25,6 +26,7 @@ export type NoteDocEditibleProps = {
   content: string
   folderPathname: string
   tags: string[]
+  bookmarked: boolean
   data: JsonObject
 }
 
@@ -35,6 +37,8 @@ export type NoteDoc = {
   trashed: boolean
   _rev: string
 } & NoteDocEditibleProps
+
+export type PopulatedNoteDoc = NoteDoc & { storageId: string }
 
 export type FolderDoc = {
   _id: string // folder:${FOLDER_PATHNAME}
@@ -51,7 +55,6 @@ export type TagDoc = {
   _id: string // tag:${TAG_NAME}
   createdAt: string
   updatedAt: string
-  data: JsonObject
   _rev: string
 } & TagDocEditibleProps
 
@@ -59,8 +62,14 @@ export type TagDocEditibleProps = {
   data: JsonObject
 }
 
+export type Attachment = {
+  name: string
+  type: string
+  blob: Blob
+}
+
 export interface AllDocsMap {
-  noteMap: ObjectMap<NoteDoc>
+  noteMap: ObjectMap<PopulatedNoteDoc>
   folderMap: ObjectMap<FolderDoc>
   tagMap: ObjectMap<TagDoc>
 }
@@ -86,7 +95,8 @@ export type PopulatedTagDoc = TagDoc & {
 }
 
 export interface AllPopulatedDocsMap {
-  noteMap: ObjectMap<NoteDoc>
+  noteMap: ObjectMap<PopulatedNoteDoc>
   folderMap: ObjectMap<PopulatedFolderDoc>
   tagMap: ObjectMap<PopulatedTagDoc>
+  attachmentMap: ObjectMap<Attachment>
 }

@@ -1,7 +1,5 @@
 import React, { useState, useMemo } from 'react'
 import styled from '../../lib/styled'
-import Icon from '../atoms/Icon'
-import { mdiClose } from '@mdi/js'
 import { usePreferences } from '../../lib/preferences'
 import TabButton from './TabButton'
 import { useGlobalKeyDownHandler } from '../../lib/keyboard'
@@ -9,7 +7,11 @@ import GeneralTab from './GeneralTab'
 import EditorTab from './EditorTab'
 import MarkdownTab from './MarkdownTab'
 import AboutTab from './AboutTab'
-import { backgroundColor, iconColor } from '../../lib/styled/styleFunctions'
+import BillingTab from './BillingTab'
+import ImportTab from './ImportTab'
+import { backgroundColor, closeIconColor } from '../../lib/styled/styleFunctions'
+import { IconClose } from '../icons'
+import { useTranslation } from 'react-i18next'
 
 const Container = styled.div`
   z-index: 7000;
@@ -50,10 +52,11 @@ const CloseButton = styled.button`
   background-color: transparent;
   border: none;
   font-size: 24px;
-  ${iconColor}
+  ${closeIconColor}
 `
 
 const PreferencesModal = () => {
+  const { t } = useTranslation()
   const { closed, toggleClosed } = usePreferences()
   const [tab, setTab] = useState('general')
 
@@ -74,6 +77,10 @@ const PreferencesModal = () => {
         return <MarkdownTab />
       case 'about':
         return <AboutTab />
+      case 'billing':
+        return <BillingTab />
+      case 'import':
+        return <ImportTab />
       case 'general':
       default:
         return <GeneralTab />
@@ -87,7 +94,7 @@ const PreferencesModal = () => {
   return (
     <Container>
       <TabNav>
-        <Header>Preferences</Header>
+        <Header>{t('preferences.general')}</Header>
         <TabButton
           label='General'
           tab='general'
@@ -118,10 +125,22 @@ const PreferencesModal = () => {
           active={tab === 'about'}
           setTab={setTab}
         />
+        <TabButton
+          label='Billing'
+          tab='billing'
+          active={tab === 'billing'}
+          setTab={setTab}
+        />
+        <TabButton
+          label='Import'
+          tab='import'
+          active={tab === 'import'}
+          setTab={setTab}
+        />
       </TabNav>
       <TabContent>{content}</TabContent>
       <CloseButton onClick={toggleClosed}>
-        <Icon path={mdiClose} />
+        <IconClose />
       </CloseButton>
     </Container>
   )

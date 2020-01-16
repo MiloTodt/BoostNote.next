@@ -12,21 +12,27 @@
   },
   "builds": [
     {
-      "src": "package.json",
-      "use": "@now/static-build",
-      "config": {
-        "distDir": "dist"
-      }
+      "src": "compiled/**/*",
+      "use": "@now/static"
     }
   ],
   "routes": [
     {
-      "src": "/app/storages/.*",
-      "dest": "/index.html"
+      "src": "/app/(.*\\.?bundle.js)$",
+      "dest": "/compiled/$1"
+    },
+    {
+      "src": "/app/(.*).(js|icon|css|svg|png|gif|jpeg)$",
+      "dest": "/compiled/app/$1.$2"
     },
     {
       "src": "/app/?(.*)",
-      "dest": "/$1"
+      "dest": "/compiled/index.html"
+    },
+    {
+      "src": "/",
+      "status": 301,
+      "headers": { "Location": "/app/" }
     }
   ]
 }

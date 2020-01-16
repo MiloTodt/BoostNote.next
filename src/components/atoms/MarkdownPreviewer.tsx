@@ -14,8 +14,15 @@ import h from 'hastscript'
 import useForceUpdate from 'use-force-update'
 import styled from '../../lib/styled'
 import cc from 'classcat'
+import { useDb } from '../../lib/db'
+import { openNew } from '../../lib/utils/platform'
 
-const schema = mergeDeepRight(gh, { attributes: { '*': ['className'] } })
+const schema = mergeDeepRight(gh, {
+  attributes: {
+    '*': ['className'],
+    input: ['checked']
+  }
+})
 
 interface Element extends Parent {
   type: 'element'
@@ -38,10 +45,7 @@ function isElement(node: Node, tagName: string): node is Element {
   if (node == null) {
     return false
   }
-  if (node.tagName !== tagName) {
-    return false
-  }
-  return true
+  return node.tagName === tagName
 }
 
 function rehypeCodeMirrorAttacher(options: Partial<RehypeCodeMirrorOptions>) {
@@ -65,7 +69,11 @@ function rehypeCodeMirrorAttacher(options: Partial<RehypeCodeMirrorOptions>) {
         parent.properties.className != null
           ? [...parent.properties.className]
           : []
-      classNames.push(`cm-s-${theme}`, 'CodeMirror')
+      if (theme === 'solarized-dark') {
+        classNames.push(`cm-s-solarized`, `cm-s-dark`, 'CodeMirror')
+      } else {
+        classNames.push(`cm-s-${theme}`, 'CodeMirror')
+      }
       if (lang != null) {
         classNames.push('language-' + lang)
       }
@@ -128,25 +136,21 @@ function rehypeCodeMirrorAttacher(options: Partial<RehypeCodeMirrorOptions>) {
     }
   }
 }
-const rehypeCodeMirror = rehypeCodeMirrorAttacher as Plugin<
+
+export const rehypeCodeMirror = rehypeCodeMirrorAttacher as Plugin<
   [Partial<RehypeCodeMirrorOptions>?]
 >
 
-interface MarkdownProcessorOptions {
-  codeBlockTheme?: string
-}
-
-function createMarkdownProcessor(options: MarkdownProcessorOptions = {}) {
-  return unified()
-    .use(remarkParse)
-    .use(remarkRehype, { allowDangerousHTML: false })
-    .use(rehypeCodeMirror, {
-      ignoreMissing: true,
-      theme: options.codeBlockTheme
-    })
-    .use(rehypeRaw)
-    .use(rehypeSanitize, schema)
-    .use(rehypeReact, { createElement: React.createElement })
+const BlobImage = ({ blob, ...props }: any) => {
+  const url = useMemo(() => {
+    return URL.createObjectURL(blob)
+  }, [blob])
+  useEffect(() => {
+    return () => {
+      URL.revokeObjectURL(url)
+    }
+  }, [blob, url])
+  return <img src={url} {...props} />
 }
 
 interface MarkdownPreviewerProps {
@@ -154,23 +158,66 @@ interface MarkdownPreviewerProps {
   codeBlockTheme?: string
   style?: string
   theme?: string
+  storageId?: string
 }
 
 const MarkdownPreviewer = ({
   content,
   codeBlockTheme,
   style,
-  theme
+  theme,
+  storageId
 }: MarkdownPreviewerProps) => {
   const forceUpdate = useForceUpdate()
   const [rendering, setRendering] = useState(false)
   const previousContentRef = useRef('')
   const previousThemeRef = useRef<string | undefined>('')
   const [renderedContent, setRenderedContent] = useState<React.ReactNode>([])
+  const { storageMap } = useDb()
 
   const markdownProcessor = useMemo(() => {
-    return createMarkdownProcessor({ codeBlockTheme })
-  }, [codeBlockTheme])
+    const options = { codeBlockTheme, storageId }
+
+    return unified()
+      .use(remarkParse)
+      .use(remarkRehype, { allowDangerousHTML: false })
+      .use(rehypeCodeMirror, {
+        ignoreMissing: true,
+        theme: options.codeBlockTheme
+      })
+      .use(rehypeRaw)
+      .use(rehypeSanitize, schema)
+      .use(rehypeReact, {
+        createElement: React.createElement,
+        components: {
+          img: ({ src, ...props }: any) => {
+            const storage = storageMap[options.storageId!]
+
+            if (storage != null && src != null && !src.match('/')) {
+              const attachment = storage.attachmentMap[src]
+              if (attachment != null) {
+                return <BlobImage blob={attachment.blob} />
+              }
+            }
+
+            return <img {...props} src={src} />
+          },
+          a: ({ href, children }: any) => {
+            return (
+              <a
+                href={href}
+                onClick={event => {
+                  event.preventDefault()
+                  openNew(href)
+                }}
+              >
+                {children}
+              </a>
+            )
+          }
+        }
+      })
+  }, [codeBlockTheme, storageId, storageMap])
 
   const renderContent = useCallback(
     async (content: string) => {

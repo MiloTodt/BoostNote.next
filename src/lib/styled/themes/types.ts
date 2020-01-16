@@ -6,12 +6,18 @@ export interface BaseTheme {
   // General
   textColor: string
   uiTextColor: string
-  activeUiTextColor: string
+  disabledUiTextColor: string
 
   primaryColor: string
   borderColor: string
   iconColor: string
   activeIconColor: string
+  noteListIconColor: string
+  noteListActiveIconColor: string
+  noteDetailIconColor: string
+  noteDetailActiveIconColor: string
+  closeIconColor: string
+  closeActiveIconColor: string
   backgroundColor: string
   secondaryBackgroundColor: string
   activeBackgroundColor: string
@@ -22,6 +28,7 @@ export interface BaseTheme {
   // SideBar
   sideBarBackgroundColor: string
   sideBarTextColor: string
+  activeSideBarSecondaryTextColor: string
   sideBarSecondaryTextColor: string
 
   // Button

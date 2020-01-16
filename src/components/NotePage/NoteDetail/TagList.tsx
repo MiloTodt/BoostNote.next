@@ -1,8 +1,8 @@
 import React, { useCallback } from 'react'
-import Icon from '../../atoms/Icon'
-import { mdiClose, mdiTagOutline } from '@mdi/js'
+import ButtonIcon from '../../atoms/ButtonIcon'
 import styled from '../../../lib/styled'
-import { iconColor } from '../../../lib/styled/styleFunctions'
+import { iconColor, noteListIconColor, inputStyle } from '../../../lib/styled/styleFunctions'
+import { IconTag, IconClose } from '../../icons'
 
 interface TagListItemProps {
   tagName: string
@@ -18,7 +18,7 @@ const TagListItem = ({ tagName, removeTagByName }: TagListItemProps) => {
     <div className='listItem'>
       <div className='listItem-label'>{tagName}</div>
       <button className='listItem-removeButton' onClick={removeTag}>
-        <Icon path={mdiClose} />
+        <IconClose />
       </button>
     </div>
   )
@@ -27,12 +27,14 @@ const TagListItem = ({ tagName, removeTagByName }: TagListItemProps) => {
 const StyledContainer = styled.div`
   display: flex;
   .listItem {
-    margin: 0 2px;
     display: flex;
+    margin: 0 2px;
+    ${inputStyle}
+    margin-right: 5px;
   }
 
   .icon {
-    ${iconColor}
+    ${noteListIconColor}
   }
 
   .listItem-label {
@@ -50,6 +52,10 @@ const StyledContainer = styled.div`
     justify-content: center;
     ${iconColor};
     background-color: transparent;
+
+    svg {
+      vertical-align: top;
+    }
   }
 `
 
@@ -61,11 +67,11 @@ interface TagListProps {
 const TagList = ({ tags, removeTagByName }: TagListProps) => {
   return (
     <StyledContainer>
-      <Icon className='icon' path={mdiTagOutline} />
+      <ButtonIcon className='icon' icon={<IconTag />} />
       {tags.map(tag => (
         <TagListItem
-          key={tag}
           tagName={tag}
+          key={tag}
           removeTagByName={removeTagByName}
         />
       ))}

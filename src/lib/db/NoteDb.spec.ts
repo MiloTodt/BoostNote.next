@@ -420,7 +420,8 @@ describe('NoteDb', () => {
         title: 'test title',
         content: 'test content',
         tags: [],
-        folderPathname: '/',
+        bookmarked: false,
+        folderPathname: '/default',
         data: {},
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
@@ -434,7 +435,8 @@ describe('NoteDb', () => {
         title: 'test title',
         content: 'test content',
         tags: [],
-        folderPathname: '/',
+        bookmarked: false,
+        folderPathname: '/default',
         data: {},
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
@@ -463,6 +465,7 @@ describe('NoteDb', () => {
         tags: ['test'],
         folderPathname: '/test',
         data: {},
+        bookmarked: false,
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
         trashed: false,
@@ -498,7 +501,8 @@ describe('NoteDb', () => {
         title: 'changed title',
         content: 'changed content',
         tags: [],
-        folderPathname: '/',
+        bookmarked: false,
+        folderPathname: '/default',
         data: {},
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
@@ -512,7 +516,8 @@ describe('NoteDb', () => {
         title: 'changed title',
         content: 'changed content',
         tags: [],
-        folderPathname: '/',
+        bookmarked: false,
+        folderPathname: '/default',
         data: {},
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
@@ -544,6 +549,7 @@ describe('NoteDb', () => {
         title: 'changed title',
         content: 'changed content',
         tags: ['new'],
+        bookmarked: false,
         folderPathname: '/new folder',
         data: {},
         createdAt: expect.any(String),
@@ -609,6 +615,7 @@ describe('NoteDb', () => {
           content: 'test content1',
           folderPathname: '/test',
           tags: [],
+          bookmarked: false,
           data: {},
           createdAt: expect.any(String),
           updatedAt: expect.any(String),
@@ -621,6 +628,7 @@ describe('NoteDb', () => {
           content: 'test content2',
           folderPathname: '/test',
           tags: [],
+          bookmarked: false,
           data: {},
           createdAt: expect.any(String),
           updatedAt: expect.any(String),
@@ -638,19 +646,19 @@ describe('NoteDb', () => {
       const note1 = await noteDb.createNote({
         title: 'test title1',
         content: 'test content1',
-        folderPathname: '/',
+        folderPathname: '/default',
         tags: ['tag1']
       })
       const note2 = await noteDb.createNote({
         title: 'test title2',
         content: 'test content2',
-        folderPathname: '/',
+        folderPathname: '/default',
         tags: ['tag1', 'tag2']
       })
       const note3 = await noteDb.createNote({
         title: 'test title3',
         content: 'test content3',
-        folderPathname: '/',
+        folderPathname: '/default',
         tags: ['tag2']
       })
 
@@ -664,8 +672,9 @@ describe('NoteDb', () => {
           _rev: note1._rev,
           title: 'test title1',
           content: 'test content1',
-          folderPathname: '/',
+          folderPathname: '/default',
           tags: ['tag1'],
+          bookmarked: false,
           data: {},
           createdAt: expect.any(String),
           updatedAt: expect.any(String),
@@ -676,8 +685,9 @@ describe('NoteDb', () => {
           _rev: note2._rev,
           title: 'test title2',
           content: 'test content2',
-          folderPathname: '/',
+          folderPathname: '/default',
           tags: ['tag1', 'tag2'],
+          bookmarked: false,
           data: {},
           createdAt: expect.any(String),
           updatedAt: expect.any(String),
@@ -695,9 +705,10 @@ describe('NoteDb', () => {
           _rev: note2._rev,
           title: 'test title2',
           content: 'test content2',
-          folderPathname: '/',
+          folderPathname: '/default',
           tags: ['tag1', 'tag2'],
           data: {},
+          bookmarked: false,
           createdAt: expect.any(String),
           updatedAt: expect.any(String),
           trashed: false
@@ -707,8 +718,9 @@ describe('NoteDb', () => {
           _rev: note3._rev,
           title: 'test title3',
           content: 'test content3',
-          folderPathname: '/',
+          folderPathname: '/default',
           tags: ['tag2'],
+          bookmarked: false,
           data: {},
           createdAt: expect.any(String),
           updatedAt: expect.any(String),
@@ -795,6 +807,7 @@ describe('NoteDb', () => {
         createdAt: now,
         updatedAt: now,
         trashed: true,
+        bookmarked: false,
         title: 'test title',
         content: 'test content',
         data: {}
@@ -874,13 +887,13 @@ describe('NoteDb', () => {
       const note1 = await noteDb.createNote({
         title: 'test title1',
         content: 'test content1',
-        folderPathname: '/',
+        folderPathname: '/default',
         tags: ['tag1']
       })
       const note2 = await noteDb.createNote({
         title: 'test title2',
         content: 'test content2',
-        folderPathname: '/',
+        folderPathname: '/default',
         tags: ['tag1', 'tag2']
       })
 
@@ -1044,8 +1057,8 @@ describe('NoteDb', () => {
 
       // Then
       expect(result.noteMap).toEqual({
-        [note1._id]: note1,
-        [note2._id]: note2
+        [note1._id]: { storageId: client.id, ...note1 },
+        [note2._id]: { storageId: client.id, ...note2 }
       })
 
       expect(result.folderMap).toEqual({

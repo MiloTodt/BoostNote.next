@@ -1,6 +1,4 @@
 import React, { useCallback } from 'react'
-import Icon from '../atoms/Icon'
-import { mdiPlus, mdiLoading } from '@mdi/js'
 import {
   Section,
   SectionHeader,
@@ -12,25 +10,30 @@ import {
   usePreferences,
   GeneralThemeOptions,
   GeneralLanguageOptions,
-  GeneralNoteSortingOptions
+  GeneralNoteSortingOptions,
+  GeneralTutorialsOptions
 } from '../../lib/preferences'
 import { useTranslation } from 'react-i18next'
 import { SelectChangeEventHandler } from '../../lib/events'
 import { useUsers } from '../../lib/accounts'
-import UserInfo from '../atoms/UserInfo'
+import UserInfo from './UserInfo'
 import LoginButton from '../atoms/LoginButton'
+import { useAnalytics, analyticsEvents } from '../../lib/analytics'
+import { IconArrowRotate } from '../icons'
 
 const GeneralTab = () => {
   const { preferences, setPreferences } = usePreferences()
   const [users, { removeUser }] = useUsers()
+  const { report } = useAnalytics()
 
   const selectTheme: SelectChangeEventHandler = useCallback(
     event => {
       setPreferences({
         'general.theme': event.target.value as GeneralThemeOptions
       })
+      report(analyticsEvents.colorTheme)
     },
-    [setPreferences]
+    [setPreferences, report]
   )
 
   const selectLanguage: SelectChangeEventHandler = useCallback(
@@ -51,6 +54,15 @@ const GeneralTab = () => {
     [setPreferences]
   )
 
+  const selectTutorialsDisplay: SelectChangeEventHandler = useCallback(
+    event => {
+      setPreferences({
+        'general.tutorials': event.target.value as GeneralTutorialsOptions
+      })
+    },
+    [setPreferences]
+  )
+
   const { t } = useTranslation()
 
   return (
@@ -61,28 +73,23 @@ const GeneralTab = () => {
           {users.map(user => (
             <UserInfo key={user.id} user={user} signout={removeUser} />
           ))}
-          <LoginButton
-            onErr={console.error /* TODO: Toast error */}
-            ButtonComponent={SectionPrimaryButton}
-          >
-            {loginState =>
-              loginState !== 'logging-in' ? (
-                <>
-                  <Icon path={mdiPlus} />
-                  {t(
-                    users.length === 0
-                      ? 'preferences.addAccount'
-                      : 'preferences.switchAccount'
-                  )}
-                </>
-              ) : (
-                <>
-                  <Icon path={mdiLoading} />
-                  {t('preferences.loginWorking')}
-                </>
-              )
-            }
-          </LoginButton>
+          {users.length === 0 && (
+            <LoginButton
+              onErr={console.error /* TODO: Toast error */}
+              ButtonComponent={SectionPrimaryButton}
+            >
+              {loginState =>
+                loginState !== 'logging-in' ? (
+                  <>{t('preferences.addAccount')}</>
+                ) : (
+                  <>
+                    <IconArrowRotate />
+                    {t('preferences.loginWorking')}
+                  </>
+                )
+              }
+            </LoginButton>
+          )}
         </div>
       </Section>
       <Section>
@@ -94,6 +101,10 @@ const GeneralTab = () => {
           >
             <option value='en-US'>English (US)</option>
             <option value='ja'>日本語</option>
+            <option value='es-ES'>Español (España)</option>
+            <option value='zh-CN'>Chinese (zh-CN)</option>
+            <option value='ko'>Korean</option>
+            <option value='pt-BR'>Portuguese (pt-BR)</option>
           </SectionSelect>
         </SectionControl>
       </Section>
@@ -107,7 +118,8 @@ const GeneralTab = () => {
             <option value='auto'>{t('preferences.auto')}</option>
             <option value='light'>{t('preferences.light')}</option>
             <option value='dark'>{t('preferences.dark')}</option>
-            <option value='solarized-dark'>
+            <option value='sepia'>{t('preferences.sepia')}</option>
+            <option value='solarizedDark'>
               {t('preferences.solarizedDark')}
             </option>
           </SectionSelect>
@@ -123,6 +135,18 @@ const GeneralTab = () => {
             <option value='date-updated'>{t('preferences.dateUpdated')}</option>
             <option value='date-created'>{t('preferences.dateCreated')}</option>
             <option value='title'>{t('preferences.title')}</option>
+          </SectionSelect>
+        </SectionControl>
+      </Section>
+      <Section>
+        <SectionHeader>{t('preferences.displayTutorialsLabel')}</SectionHeader>
+        <SectionControl>
+          <SectionSelect
+            value={preferences['general.tutorials']}
+            onChange={selectTutorialsDisplay}
+          >
+            <option value='display'>Display</option>
+            <option value='hide'>Hide</option>
           </SectionSelect>
         </SectionControl>
       </Section>

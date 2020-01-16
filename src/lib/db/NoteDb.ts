@@ -1,3 +1,5 @@
+import dashify from 'dashify'
+import parsePath from 'path-parse'
 import {
   AllDocsMap,
   FolderDoc,
@@ -6,7 +8,10 @@ import {
   TagDoc,
   NoteDoc,
   NoteDocEditibleProps,
-  ExceptRev
+  ExceptRev,
+  ObjectMap,
+  Attachment,
+  PopulatedNoteDoc
 } from './types'
 import {
   getFolderId,
@@ -25,7 +30,7 @@ import {
   getTagName,
   values
 } from './utils'
-import { FOLDER_ID_PREFIX } from './consts'
+import { FOLDER_ID_PREFIX, ATTACHMENTS_ID } from './consts'
 import PouchDB from './PouchDB'
 import { buildCloudSyncUrl, User } from '../accounts'
 import { setHeader } from '../utils/http'
@@ -43,14 +48,18 @@ export default class NoteDb {
     await this.upsertNoteListViews()
 
     const { noteMap, folderMap, tagMap } = await this.getAllDocsMap()
-    const { missingPathnameSet, missingTagNameSet } = values(noteMap).reduce<{
+    const { missingPathnameSet, missingTagNameSet, requiresUpdate } = values(
+      noteMap
+    ).reduce<{
       missingPathnameSet: Set<string>
       missingTagNameSet: Set<string>
+      requiresUpdate: NoteDoc[]
     }>(
       (obj, noteDoc) => {
         if (noteDoc.trashed) {
           return obj
         }
+
         if (folderMap[noteDoc.folderPathname] == null) {
           obj.missingPathnameSet.add(noteDoc.folderPathname)
         }
@@ -61,14 +70,19 @@ export default class NoteDb {
         })
         return obj
       },
-      { missingPathnameSet: new Set(), missingTagNameSet: new Set() }
+      {
+        missingPathnameSet: new Set(),
+        missingTagNameSet: new Set(),
+        requiresUpdate: []
+      }
     )
 
+    await this.upsertFolder('/')
+
     await Promise.all([
-      ...[...missingPathnameSet, '/'].map(pathname =>
-        this.upsertFolder(pathname)
-      ),
-      ...[...missingTagNameSet].map(tagName => this.upsertTag(tagName))
+      ...[...missingPathnameSet].map(pathname => this.upsertFolder(pathname)),
+      ...[...missingTagNameSet].map(tagName => this.upsertTag(tagName)),
+      ...requiresUpdate.map(note => this.updateNote(note._id, note))
     ])
   }
 
@@ -115,7 +129,9 @@ export default class NoteDb {
 
   async doesParentFolderExistOrCreate(pathname: string) {
     const parentPathname = getParentFolderPathname(pathname)
-    await this.upsertFolder(parentPathname)
+    if (parentPathname !== '/') {
+      await this.upsertFolder(parentPathname)
+    }
   }
 
   async getAllDocsMap(): Promise<AllDocsMap> {
@@ -132,7 +148,10 @@ export default class NoteDb {
     return allDocsResponse.rows.reduce((map, row) => {
       const { doc } = row
       if (isNoteDoc(doc)) {
-        map.noteMap[doc._id] = doc
+        map.noteMap[doc._id] = {
+          ...doc,
+          storageId: this.id
+        } as PopulatedNoteDoc
       } else if (isFolderDoc(doc)) {
         map.folderMap[getFolderPathname(doc._id)] = doc
       } else if (isTagDoc(doc)) {
@@ -204,11 +223,12 @@ export default class NoteDb {
     const now = getNow()
     const noteDocProps: ExceptRev<NoteDoc> = {
       _id: generateNoteId(),
-      title: 'Untitled',
+      title: '',
       content: '',
       tags: [],
-      folderPathname: '/',
+      folderPathname: '/default',
       data: {},
+      bookmarked: false,
       ...noteProps,
       createdAt: now,
       updatedAt: now,
@@ -430,6 +450,9 @@ export default class NoteDb {
   }
 
   async getFoldersByPathnames(pathnames: string[]): Promise<FolderDoc[]> {
+    if (pathnames.length === 0) {
+      return []
+    }
     const allDocsResponse = await this.pouchDb.allDocs<FolderDoc>({
       keys: pathnames.map(pathname => getFolderId(pathname)),
       include_docs: true
@@ -466,5 +489,71 @@ export default class NoteDb {
         .on('error', reject)
         .on('complete', resolve)
     })
+  }
+
+  async upsertAttachments(files: File[]): Promise<Attachment[]> {
+    const { _rev } = await this.pouchDb.get(ATTACHMENTS_ID)
+    let currentRev = _rev
+    const attachments: Attachment[] = []
+    for (const file of files) {
+      const { name, ext } = parsePath(file.name)
+      const fileName = `${dashify(name)}${ext}`
+      const response = await this.pouchDb.putAttachment(
+        ATTACHMENTS_ID,
+        fileName,
+        currentRev,
+        file,
+        file.type
+      )
+      currentRev = response.rev
+      const data = await this.pouchDb.getAttachment(ATTACHMENTS_ID, fileName)
+      attachments.push({
+        name: fileName,
+        type: file.type,
+        blob: data as Blob
+      })
+    }
+
+    return attachments
+  }
+
+  async removeAttachment(fileName: string): Promise<void> {
+    const { _rev } = await this.pouchDb.get(ATTACHMENTS_ID)
+    await this.pouchDb.removeAttachment(ATTACHMENTS_ID, fileName, _rev)
+  }
+
+  async getAttachmentMap(): Promise<ObjectMap<Attachment>> {
+    let attachmentDoc
+    try {
+      attachmentDoc = await this.pouchDb.get(ATTACHMENTS_ID, {
+        attachments: true,
+        binary: true
+      })
+    } catch (error) {
+      if (error.name !== 'not_found') {
+        throw error
+      }
+      await this.pouchDb.put({ _id: ATTACHMENTS_ID })
+      attachmentDoc = await this.pouchDb.get(ATTACHMENTS_ID, {
+        attachments: true,
+        binary: true
+      })
+    }
+
+    const { _attachments } = attachmentDoc
+    if (_attachments == null) {
+      return {}
+    }
+    return Object.entries(_attachments).reduce(
+      (map, [key, attachment]) => {
+        map[key] = {
+          name: key,
+          type: attachment.content_type,
+          blob: (attachment as PouchDB.Core.FullAttachment).data as Blob
+        }
+        return map
+      },
+      {} as ObjectMap<Attachment>
+    )
   }
 }

@@ -1,17 +1,15 @@
 import React from 'react'
-import Icon from './Icon'
 import styled from '../../lib/styled'
-import { iconColor } from '../../lib/styled/styleFunctions'
+import { noteListIconColor } from '../../lib/styled/styleFunctions'
 
 const StyledButton = styled.button<{ active: boolean }>`
   background: transparent;
-  width: 32px;
   height: 32px;
   box-sizing: border-box;
   font-size: 16px;
   outline: none;
   border: none;
-  ${iconColor}
+  ${noteListIconColor}
   &:first-child {
     margin-left: 0;
   }
@@ -21,20 +19,20 @@ const StyledButton = styled.button<{ active: boolean }>`
 `
 
 interface ToolbarButtonProps {
+  icon: React.ReactNode
   active?: boolean
-  path: string
   className?: string
   onClick: React.MouseEventHandler
 }
 
 const ToolbarButton = ({
-  path,
+  icon,
   onClick,
   active = false,
   className
 }: ToolbarButtonProps) => (
   <StyledButton onClick={onClick} active={active} className={className}>
-    <Icon path={path} />
+    {icon}
   </StyledButton>
 )
 

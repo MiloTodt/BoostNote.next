@@ -1,16 +1,16 @@
 import React from 'react'
-import { NoteDoc, NoteDocEditibleProps } from '../../../lib/db/types'
+import { includes } from 'ramda'
+import {
+  NoteDoc,
+  NoteDocEditibleProps,
+  Attachment,
+  PopulatedNoteDoc
+} from '../../../lib/db/types'
 import { isTagNameValid } from '../../../lib/db/utils'
 import TagList from './TagList'
 import styled from '../../../lib/styled'
 import CustomizedCodeEditor from '../../atoms/CustomizedCodeEditor'
 import CustomizedMarkdownPreviewer from '../../atoms/CustomizedMarkdownPreviewer'
-import {
-  mdiTrashCan,
-  mdiEyeOutline,
-  mdiArrowSplitVertical,
-  mdiFormatText
-} from '@mdi/js'
 import ToolbarIconButton from '../../atoms/ToolbarIconButton'
 import Toolbar from '../../atoms/Toolbar'
 import ToolbarSeparator from '../../atoms/ToolbarSeparator'
@@ -18,14 +18,71 @@ import {
   secondaryBackgroundColor,
   textColor,
   borderBottom,
-  borderRight
+  borderRight,
+  uiTextColor,
+  PrimaryTextColor
 } from '../../../lib/styled/styleFunctions'
+import ToolbarExportButton from '../../atoms/ToolbarExportButton'
+import { getFileList } from '../../../lib/dnd'
+import { ViewModeType } from '../../../lib/generalStatus'
+import { BreadCrumbs } from '../NotePage'
+import cc from 'classcat'
+import {
+  IconTrash,
+  IconArrowAgain,
+  IconPreview,
+  IconSplitView,
+  IconEditView
+} from '../../icons'
+import {
+  listenNoteDetailFocusTitleInputEvent,
+  unlistenNoteDetailFocusTitleInputEvent
+} from '../../../lib/events'
 
-const StyledNoteDetailContainer = styled.div`
+export const StyledNoteDetailContainer = styled.div`
   ${secondaryBackgroundColor}
   display: flex;
   flex-direction: column;
   height: 100%;
+  .breadCrumbs {
+    -webkit-app-region: drag;
+    display: block;
+    width: 100%;
+    height: 25px;
+    font-size: 14px;
+    padding: 5px 10px;
+    overflow: hidden;
+
+    .wrapper {
+      display: block;
+      position: relative;
+      white-space: nowrap;
+      padding-bottom: 16px;
+      overflow-x: scroll;
+      width: 100%;
+    }
+
+    .separator {
+      ${uiTextColor}
+      display: inline-block;
+    }
+
+    .folderLink {
+      display: inline-block;
+      padding: 0 9px;
+      cursor: pointer;
+      ${uiTextColor}
+
+      &:first-of-type {
+        padding-left: 0;
+      }
+
+      &.active,
+      &:hover {
+        ${PrimaryTextColor}
+      }
+    }
+  }
   .titleSection {
     display: flex;
     height: 50px;
@@ -84,22 +141,45 @@ const StyledNoteDetailContainer = styled.div`
     ${textColor}
     margin-left: 4px;
   }
+
+  .buttonsWrapper {
+    button + button {
+      margin-left: 8px;
+    }
+  }
+
+  .tagsWrapper {
+    padding: 5px 0;
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 20px;
+    input {
+      min-width: 0 !important;
+      width: 100%;
+    }
+  }
 `
 
 type NoteDetailProps = {
-  storageId: string
-  note: NoteDoc
+  noteStorageName: string
+  currentPathnameWithoutNoteId: string
+  note: PopulatedNoteDoc
   updateNote: (
     storageId: string,
     noteId: string,
     props: Partial<NoteDocEditibleProps>
   ) => Promise<void | NoteDoc>
   trashNote: (storageId: string, noteId: string) => Promise<NoteDoc | undefined>
-  removeNote: (storageId: string, noteId: string) => Promise<void>
-  splitMode: boolean
-  previewMode: boolean
-  toggleSplitMode: () => void
-  togglePreviewMode: () => void
+  untrashNote: (
+    storageId: string,
+    noteId: string
+  ) => Promise<NoteDoc | undefined>
+  purgeNote: (storageId: string, noteId: string) => void
+  viewMode: ViewModeType
+  toggleViewMode: (mode: ViewModeType) => void
+  addAttachments(storageId: string, files: File[]): Promise<Attachment[]>
+  push: (path: string) => void
+  breadCrumbs?: BreadCrumbs
 }
 
 type NoteDetailState = {
@@ -134,7 +214,8 @@ export default class NoteDetail extends React.Component<
     props: NoteDetailProps,
     state: NoteDetailState
   ): NoteDetailState {
-    const { note, storageId } = props
+    const { note } = props
+    const { storageId } = note
     if (storageId !== state.prevStorageId || note._id !== state.prevNoteId) {
       return {
         prevStorageId: storageId,
@@ -150,14 +231,17 @@ export default class NoteDetail extends React.Component<
 
   componentDidUpdate(_prevProps: NoteDetailProps, prevState: NoteDetailState) {
     const { note } = this.props
-    if (note._id !== prevState.prevNoteId && this.queued) {
-      const { title, content, tags } = prevState
-      this.saveNote(prevState.prevStorageId, prevState.prevNoteId, {
-        title,
-        content,
-        tags
-      })
+    if (prevState.prevNoteId !== note._id) {
+      if (this.queued) {
+        const { title, content, tags } = prevState
+        this.saveNote(prevState.prevStorageId, prevState.prevNoteId, {
+          title,
+          content,
+          tags
+        })
+      }
     }
+    listenNoteDetailFocusTitleInputEvent(this.focusTitleInput)
   }
 
   componentWillUnmount() {
@@ -169,6 +253,11 @@ export default class NoteDetail extends React.Component<
         tags
       })
     }
+    unlistenNoteDetailFocusTitleInputEvent(this.focusTitleInput)
+  }
+
+  focusTitleInput = () => {
+    this.titleInputRef.current!.focus()
   }
 
   updateTitle = () => {
@@ -209,17 +298,21 @@ export default class NoteDetail extends React.Component<
   }
 
   appendNewTag = () => {
-    if (isTagNameValid(this.state.newTagName)) {
-      this.setState(
-        prevState => ({
-          newTagName: '',
-          tags: [...prevState.tags, prevState.newTagName]
-        }),
-        () => {
-          this.queueToSave()
-        }
-      )
+    if (includes(this.state.newTagName, this.state.tags)) {
+      return
     }
+    if (!isTagNameValid(this.state.newTagName)) {
+      return
+    }
+    this.setState(
+      prevState => ({
+        newTagName: '',
+        tags: [...prevState.tags, prevState.newTagName]
+      }),
+      () => {
+        this.queueToSave()
+      }
+    )
   }
 
   removeTagByName = (tagName: string) => {
@@ -234,7 +327,8 @@ export default class NoteDetail extends React.Component<
   }
 
   trashNote = async () => {
-    const { storageId, note } = this.props
+    const { note } = this.props
+    const { storageId } = note
     const noteId = note._id
 
     if (this.queued) {
@@ -248,8 +342,40 @@ export default class NoteDetail extends React.Component<
     await this.props.trashNote(storageId, noteId)
   }
 
+  untrashNote = async () => {
+    const { note } = this.props
+    const { storageId } = note
+    const noteId = note._id
+
+    if (this.queued) {
+      const { title, content, tags } = this.state
+      await this.saveNote(storageId, noteId, {
+        title,
+        content,
+        tags
+      })
+    }
+    await this.props.untrashNote(storageId, noteId)
+  }
+
+  purgeNote = async () => {
+    const { note } = this.props
+    const { storageId } = note
+    const noteId = note._id
+
+    if (this.queued) {
+      const { title, content, tags } = this.state
+      await this.saveNote(storageId, noteId, {
+        title,
+        content,
+        tags
+      })
+    }
+    await this.props.purgeNote(storageId, noteId)
+  }
+
   queued = false
-  timer?: number
+  timer?: any
 
   queueToSave = () => {
     this.queued = true
@@ -257,7 +383,8 @@ export default class NoteDetail extends React.Component<
       clearTimeout(this.timer)
     }
     this.timer = setTimeout(() => {
-      const { storageId, note } = this.props
+      const { note } = this.props
+      const { storageId } = note
       const { title, content, tags } = this.state
 
       this.saveNote(storageId, note._id, { title, content, tags })
@@ -286,15 +413,50 @@ export default class NoteDetail extends React.Component<
     }
   }
 
+  handleDrop = async (event: React.DragEvent) => {
+    event.preventDefault()
+
+    const { note, addAttachments } = this.props
+    const { storageId } = note
+
+    const files = getFileList(event).filter(file =>
+      file.type.startsWith('image/')
+    )
+
+    const attachments = await addAttachments(storageId, files)
+
+    this.setState(
+      prevState => {
+        return {
+          content:
+            prevState.content +
+            `\n` +
+            attachments
+              .map(attachment => `![](${attachment.name})`)
+              .join('\n') +
+            `\n`
+        }
+      },
+      () => {
+        this.queueToSave()
+      }
+    )
+  }
+
+  handleBreadCrumbsClick = (folderPathname: string) => () => {
+    const { storageId } = this.props.note
+    this.props.push(`/app/storages/${storageId}/notes${folderPathname}`)
+  }
+
   render() {
     const {
       note,
-      splitMode,
-      previewMode,
-      toggleSplitMode,
-      togglePreviewMode
+      viewMode,
+      toggleViewMode,
+      noteStorageName,
+      currentPathnameWithoutNoteId
     } = this.props
-
+    const { storageId } = note
     const codeEditor = (
       <CustomizedCodeEditor
         className='editor'
@@ -304,27 +466,79 @@ export default class NoteDetail extends React.Component<
         onChange={this.updateContent}
       />
     )
+
     const markdownPreviewer = (
-      <CustomizedMarkdownPreviewer content={this.state.content} />
+      <CustomizedMarkdownPreviewer
+        content={this.state.content}
+        storageId={storageId}
+      />
     )
 
     return (
-      <StyledNoteDetailContainer>
+      <StyledNoteDetailContainer
+        onDragEnd={(event: React.DragEvent) => {
+          event.preventDefault()
+        }}
+        onDrop={this.handleDrop}
+      >
         {note == null ? (
           <p>No note is selected</p>
         ) : (
           <>
+            <div className='breadCrumbs'>
+              <div className='wrapper'>
+                <div
+                  onClick={this.handleBreadCrumbsClick('/')}
+                  className={cc([
+                    'folderLink',
+                    'allNotesLink',
+                    currentPathnameWithoutNoteId ===
+                      `/app/storages/${note.storageId}/notes` && 'active'
+                  ])}
+                >
+                  {noteStorageName}
+                </div>
+                {this.props.breadCrumbs != null && (
+                  <>
+                    <div className='separator'>&frasl;</div>
+                    {this.props.breadCrumbs
+                      .map(breadCrumb => (
+                        <div
+                          onClick={this.handleBreadCrumbsClick(
+                            breadCrumb.folderPathname
+                          )}
+                          className={cc([
+                            'folderLink',
+                            breadCrumb.folderIsActive && 'active'
+                          ])}
+                          key={breadCrumb.folderLabel}
+                        >
+                          {breadCrumb.folderLabel}
+                        </div>
+                      ))
+                      .reduce((prev, curr) => (
+                        <>
+                          {prev}
+                          <div className='separator'>&frasl;</div>
+                          {curr}
+                        </>
+                      ))}
+                  </>
+                )}
+              </div>
+            </div>
             <div className='titleSection'>
               <input
                 ref={this.titleInputRef}
                 value={this.state.title}
                 onChange={this.updateTitle}
+                placeholder='Title'
               />
             </div>
             <div className='contentSection'>
-              {previewMode ? (
+              {viewMode === 'preview' ? (
                 markdownPreviewer
-              ) : splitMode ? (
+              ) : viewMode === 'split' ? (
                 <>
                   <div className='splitLeft'>{codeEditor}</div>
                   <div className='splitRight'>{markdownPreviewer}</div>
@@ -334,31 +548,56 @@ export default class NoteDetail extends React.Component<
               )}
             </div>
             <Toolbar>
-              <TagList
-                tags={this.state.tags}
-                removeTagByName={this.removeTagByName}
-              />
-              <input
-                className='tagInput'
-                ref={this.newTagNameInputRef}
-                value={this.state.newTagName}
-                placeholder='Set Tags for the note...'
-                onChange={this.updateNewTagName}
-                onKeyDown={this.handleNewTagNameInputKeyDown}
-              />
-              <ToolbarSeparator />
-              <ToolbarIconButton onClick={() => {}} path={mdiFormatText} />
-              <ToolbarIconButton
-                className={splitMode ? 'active' : ''}
-                onClick={toggleSplitMode}
-                path={mdiArrowSplitVertical}
-              />
-              <ToolbarIconButton
-                className={previewMode ? 'active' : ''}
-                onClick={togglePreviewMode}
-                path={mdiEyeOutline}
-              />
-              <ToolbarIconButton onClick={this.trashNote} path={mdiTrashCan} />
+              <div className='tagsWrapper'>
+                <TagList
+                  tags={this.state.tags}
+                  removeTagByName={this.removeTagByName}
+                />
+                <input
+                  className='tagInput'
+                  ref={this.newTagNameInputRef}
+                  value={this.state.newTagName}
+                  placeholder='Tags'
+                  onChange={this.updateNewTagName}
+                  onKeyDown={this.handleNewTagNameInputKeyDown}
+                />
+                <ToolbarSeparator />
+              </div>
+              <div className='buttonsWrapper'>
+                <ToolbarIconButton
+                  className={viewMode === 'edit' ? 'active' : ''}
+                  onClick={() => toggleViewMode('edit')}
+                  icon={<IconEditView />}
+                />
+                <ToolbarIconButton
+                  className={viewMode === 'split' ? 'active' : ''}
+                  onClick={() => toggleViewMode('split')}
+                  icon={<IconSplitView />}
+                />
+                <ToolbarIconButton
+                  className={viewMode === 'preview' ? 'active' : ''}
+                  onClick={() => toggleViewMode('preview')}
+                  icon={<IconPreview />}
+                />
+                {note.trashed ? (
+                  <>
+                    <ToolbarIconButton
+                      onClick={this.untrashNote}
+                      icon={<IconArrowAgain />}
+                    />
+                    <ToolbarIconButton
+                      onClick={this.purgeNote}
+                      icon={<IconTrash />}
+                    />
+                  </>
+                ) : (
+                  <ToolbarIconButton
+                    onClick={this.trashNote}
+                    icon={<IconTrash />}
+                  />
+                )}
+                <ToolbarExportButton note={this.props.note} />
+              </div>
             </Toolbar>
           </>
         )}

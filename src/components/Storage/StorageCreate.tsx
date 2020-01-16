@@ -1,83 +1,100 @@
 import React, { useState } from 'react'
 import { usePreferences } from '../../lib/preferences'
-import { Section, SectionHeader } from '../PreferencesModal/styled'
+import {
+  SectionMargin,
+  SectionHeader1,
+  RightMargin,
+  TopMargin,
+  SectionPrimaryButton
+} from '../PreferencesModal/styled'
 import { useTranslation } from 'react-i18next'
 import { useDb } from '../../lib/db'
-import { CloudStorage } from '../../lib/accounts'
 import LoginButton from '../atoms/LoginButton'
-import CloudStorageSelector from './CloudStorageSelector'
+import { useToast } from '../../lib/toast'
+import { useRouter } from '../../lib/router'
 
 export default () => {
   const db = useDb()
   const { preferences } = usePreferences()
+  const { pushMessage } = useToast()
   const { t } = useTranslation()
-  const [localName, setLocalName] = useState('')
+  const [name, setName] = useState('')
   const [storageType, setStorageType] = useState<'cloud' | 'local'>('cloud')
+  const { push } = useRouter()
 
   const user = preferences['general.accounts'][0]
 
   const isLoggedIn = user != null
 
-  const createStorageCallback = async (cloudStorage?: CloudStorage) => {
-    const newStorage = await db.createStorage(localName)
-
-    if (cloudStorage != null) {
-      const success = db.setCloudLink(newStorage.id, cloudStorage, user)
-      if (!success) {
-        console.error('sync failed')
-        // TODO: toast sync failure
-      }
+  const createStorageCallback = async () => {
+    // editStoragePage edits cloud storage directly
+    // update local -> update cloud -> on fail -> revert local
+    try {
+      const storage = await db.createStorage(name, storageType)
+      push(`/app/storages/${storage.id}/notes`)
+    } catch {
+      pushMessage({
+        title: 'Cloud Error',
+        description:
+          'An error occured while attempting to create a cloud storage'
+      })
     }
   }
 
   return (
     <div>
-      <Section>
-        <SectionHeader>{t('storage.add')}</SectionHeader>
-        <label>Storage Name</label>
-        <input
-          type='text'
-          value={localName}
-          onChange={e => setLocalName(e.target.value)}
-        />
+      <SectionMargin>
+        <SectionHeader1>{t('Create new storage')}</SectionHeader1>
+        <RightMargin>
+          <label>{t('storage.name')}</label>
+        </RightMargin>
+        <RightMargin>
+          <input
+            type='text'
+            value={name}
+            onChange={e => setName(e.target.value)}
+          />
+        </RightMargin>
+        <RightMargin>
+          <label>
+            <input
+              type='radio'
+              checked={storageType === 'cloud'}
+              onChange={() => setStorageType('cloud')}
+            />
+            {t('storage.typeCloud')}
+          </label>
+        </RightMargin>
         <label>
           <input
             type='radio'
             checked={storageType === 'local'}
             onChange={() => setStorageType('local')}
           />
-          Local
+          {t('storage.typeLocal')}
         </label>
-        <label>
-          <input
-            type='radio'
-            checked={storageType === 'cloud'}
-            onChange={() => setStorageType('cloud')}
-          />
-          Cloud
-        </label>
-      </Section>
-      <Section>
-        {storageType === 'local' && (
+
+        {(storageType === 'local' || isLoggedIn) && (
           <>
-            <button onClick={() => createStorageCallback()}>Add Storage</button>
+            <TopMargin>
+              <SectionPrimaryButton onClick={() => createStorageCallback()}>
+                {t('storage.create')}
+              </SectionPrimaryButton>
+            </TopMargin>
           </>
         )}
         {!isLoggedIn && storageType === 'cloud' && (
           <>
-            <p>You need to sign in to add a cloud folder</p>
-            <LoginButton />
+            <TopMargin>
+              <p>{t('storage.needSignIn')}</p>
+              <LoginButton
+                onErr={console.error /* TODO: Toast error */}
+                ButtonComponent={SectionPrimaryButton}
+              />
+            </TopMargin>
           </>
         )}
-        {isLoggedIn && storageType === 'cloud' && (
-          <CloudStorageSelector
-            user={user}
-            name={localName}
-            onSelect={createStorageCallback}
-            buttonText='Add Storage'
-          />
-        )}
-      </Section>
+      </SectionMargin>
     </div>
   )
 }

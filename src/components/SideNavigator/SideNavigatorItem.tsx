@@ -1,111 +1,207 @@
-import React, { useState, MouseEventHandler } from 'react'
-import styled from '../../lib/styled'
-import { Link } from '../../lib/router'
-import Icon from '../atoms/Icon'
-import { mdiChevronDown, mdiChevronRight } from '@mdi/js'
+import React from 'react'
 import cc from 'classcat'
+import styled from '../../lib/styled'
 import {
-  uiTextColor,
-  activeBackgroundColor
+  sideBarTextColor,
+  sideBarSecondaryTextColor,
+  activeBackgroundColor,
+  iconColor
 } from '../../lib/styled/styleFunctions'
+import { IconArrowSingleRight, IconArrowSingleDown } from '../icons'
 
-const StyledContainer = styled.div`
+const Container = styled.div`
+  position: relative;
   user-select: none;
-  .header {
-    position: relative;
-    height: 30px;
-    display: flex;
-    align-items: center;
-  }
-  .headerLink {
-    width: 100%;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    text-decoration: none;
-    ${uiTextColor}
+  height: 34px;
+  display: flex;
+  justify-content: space-between;
 
-    transition: 200ms background-color;
+  .sideNavWrapper {
+    min-width: 0;
+    flex: 1 1 auto;
 
-    &:hover,
-    &:focus,
-    &:active,
-    &.active {
-      ${activeBackgroundColor}
+    button > span {
+      width: 30px;
+      ${iconColor}
     }
   }
-  .toggleButton {
-    position: absolute;
-    width: 26px;
-    height: 26px;
-    padding: 0;
-    border: none;
-    background-color: transparent;
-    margin-right: 3px;
-    border-radius: 2px;
-    top: 2px;
-    ${uiTextColor}
-    &:focus {
-      box-shadow: none;
+
+  transition: 200ms background-color;
+  &:hover,
+  &:focus,
+  &:active,
+  &.active {
+    ${activeBackgroundColor}
+
+    button > span {
+      ${sideBarTextColor}
     }
   }
-  .storageIcon {
-    margin-right: 4px;
+  &:hover {
+    cursor: pointer;
+  }
+  .control {
+    opacity: 0;
+  }
+  &:hover .control {
+    opacity: 1;
+  }
+
+  &.allnotes-sidenav {
+    padding-left: 4px !important;
+    button {
+      padding-left: 6px !important;
+    }
+  }
+  &.bookmark-sidenav {
+    padding-left: 4px !important;
+    margin-bottom: 25px;
+    button {
+      padding-left: 6px !important;
+    }
   }
 `
 
-export interface NavigatorNode {
-  iconPath?: string
-  name: string
-  href?: string
-  children?: NavigatorNode[]
-  onContextMenu?: MouseEventHandler
+const FoldButton = styled.button`
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  padding-left: 10px;
+  border: none;
+  background-color: transparent;
+  margin-right: 3px;
+  border-radius: 2px;
+  flex: 0 0 26px;
+  top: 5px;
+  ${sideBarSecondaryTextColor}
+  &:focus {
+    box-shadow: none;
+  }
+`
+
+const ClickableContainer = styled.button`
+  background-color: transparent;
+  border: none;
+  height: 35px;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+  flex: 1 1 auto;
+
+  ${sideBarTextColor}
+
+  .icon {
+    flex: 0 0 auto;
+    margin-right: 4px;
+    ${sideBarSecondaryTextColor}
+  }
+`
+
+const Label = styled.div`
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  text-align: left;
+`
+
+const ControlContainer = styled.div`
+  position: absolute;
+  right: 0;
+  top: 4px;
+  padding-left: 10px;
+  display: flex;
+  flex: 2 0 auto;
+  justify-content: flex-end;
+  button {
+    ${iconColor}
+  }
+`
+
+const SideNavigatorItemIconContainer = styled.span`
+  padding-right: 6px;
+`
+
+interface SideNaviagtorItemProps {
+  label: string
+  icon?: React.ReactNode
+  depth: number
+  controlComponents?: any[]
+  className?: string
+  folded?: boolean
   active?: boolean
+  onFoldButtonClick?: (event: React.MouseEvent) => void
+  onClick?: (event: React.MouseEvent) => void
+  onContextMenu?: (event: React.MouseEvent) => void
+  onDrop?: (event: React.DragEvent) => void
+  onDragOver?: (event: React.DragEvent) => void
+  onDragEnd?: (event: React.DragEvent) => void
+  onDoubleClick?: (event: React.MouseEvent) => void
 }
 
-interface SideNavigatorItemProps {
-  node: NavigatorNode
-  openAlways?: boolean
-  depth?: number
-}
-
-const SideNavigatorItem = ({
-  node: item,
-  openAlways = false,
-  depth = 0
-}: SideNavigatorItemProps) => {
-  const { iconPath, name, href, children, onContextMenu, active } = item
-  const [open, setOpen] = useState(true)
-  const childrenExists = children != null && children.length > 0
+const SideNaviagtorItem = ({
+  label,
+  icon,
+  depth,
+  controlComponents,
+  className,
+  folded,
+  active,
+  onFoldButtonClick,
+  onClick,
+  onDoubleClick,
+  onContextMenu,
+  onDrop,
+  onDragOver,
+  onDragEnd
+}: SideNaviagtorItemProps) => {
   return (
-    <StyledContainer>
-      <div className='header'>
-        {childrenExists && !openAlways && (
-          <button
-            className='toggleButton'
-            onClick={() => setOpen(prevOpen => !prevOpen)}
+    <Container
+      className={cc([className, active && 'active'])}
+      onContextMenu={onContextMenu}
+      onDrop={onDrop}
+      onDragOver={onDragOver}
+      onDragEnd={onDragEnd}
+    >
+      <div className='sideNavWrapper'>
+        {folded != null && (
+          <FoldButton
+            className={folded ? 'folded' : ''}
+            onClick={onFoldButtonClick}
             style={{ left: `${10 * depth}px` }}
           >
-            <Icon path={open ? mdiChevronDown : mdiChevronRight} />
-          </button>
+            {folded ? (
+              <IconArrowSingleRight color='currentColor' />
+            ) : (
+              <IconArrowSingleDown color='currentColor' />
+            )}
+          </FoldButton>
         )}
-        <Link
-          href={href}
-          className={cc(['headerLink', active && 'active'])}
-          style={{ paddingLeft: `${10 * depth + 26}px` }}
-          onContextMenu={onContextMenu}
+        <ClickableContainer
+          style={{
+            paddingLeft: `${10 * depth + 30}px`,
+            cursor: onClick ? 'pointer' : 'initial',
+            fontSize: '15px'
+          }}
+          onClick={onClick}
+          onDoubleClick={onDoubleClick}
         >
-          {iconPath != null && <Icon className='storageIcon' path={iconPath} />}
-          {name}
-        </Link>
+          {icon != null && (
+            <SideNavigatorItemIconContainer>
+              {icon}
+            </SideNavigatorItemIconContainer>
+          )}
+          <Label>{label}</Label>
+        </ClickableContainer>
       </div>
-      {open &&
-        childrenExists &&
-        children!.map(child => (
-          <SideNavigatorItem key={child.href} node={child} depth={depth + 1} />
-        ))}
-    </StyledContainer>
+      {controlComponents && (
+        <ControlContainer className='control'>
+          {controlComponents}
+        </ControlContainer>
+      )}
+    </Container>
   )
 }
 
-export default SideNavigatorItem
+export default SideNaviagtorItem
